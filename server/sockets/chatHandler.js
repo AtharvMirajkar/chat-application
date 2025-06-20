@@ -15,16 +15,72 @@ export const handleSocketConnection = (io, socket) => {
     socketId: socket.id,
     username: socket.user.username,
     isGuest: socket.user.isGuest,
+    sessionId: socket.user.sessionId || null, // store sessionId for guests
   });
 
   // Join general room by default
   socket.join("general");
 
-  // Broadcast online users
-  const onlineUsersList = Array.from(onlineUsers.entries()).map(
-    ([userId, user]) => ({ userId, username: user.username })
-  );
-  io.emit("onlineUsers", onlineUsersList);
+  // If guest, join guest session room
+  if (socket.user.isGuest && socket.user.sessionId) {
+    const guestRoom = `guest_session_${socket.user.sessionId}`;
+    socket.join(guestRoom);
+    loadRecentMessages(socket, guestRoom);
+  }
+
+  // Helper to get filtered online users for the current socket
+  function getFilteredOnlineUsers() {
+    const currentUser = onlineUsers.get(socket.user.id);
+    if (!currentUser) return [];
+    if (currentUser.isGuest) {
+      // Only guests with the same sessionId
+      return Array.from(onlineUsers.entries())
+        .filter(
+          ([_, user]) =>
+            user.isGuest && user.sessionId === currentUser.sessionId
+        )
+        .map(([userId, user]) => ({ userId, username: user.username }));
+    } else {
+      // Only normal users
+      return Array.from(onlineUsers.entries())
+        .filter(([_, user]) => !user.isGuest)
+        .map(([userId, user]) => ({ userId, username: user.username }));
+    }
+  }
+
+  // Broadcast filtered online users to the current socket
+  socket.emit("onlineUsers", getFilteredOnlineUsers());
+  // Broadcast to others as well (for their own filtered view)
+  io.sockets.sockets.forEach((s) => {
+    const sUser = Array.from(onlineUsers.entries()).find(
+      ([id, u]) => u.socketId === s.id
+    );
+    if (sUser) {
+      const [id] = sUser;
+      const userObj = onlineUsers.get(id);
+      if (userObj) {
+        // For each socket, emit their filtered online users
+        s.emit(
+          "onlineUsers",
+          (() => {
+            if (userObj.isGuest) {
+              return Array.from(onlineUsers.entries())
+                .filter(
+                  ([_, user]) =>
+                    user.isGuest && user.sessionId === userObj.sessionId
+                )
+                .map(([userId, user]) => ({ userId, username: user.username }));
+            } else {
+              return Array.from(onlineUsers.entries())
+                .filter(([_, user]) => !user.isGuest)
+                .map(([userId, user]) => ({ userId, username: user.username }));
+            }
+          })()
+        );
+      }
+    }
+  });
+
   socket.broadcast.emit("userOnline", {
     userId: socket.user.id,
     username: socket.user.username,
@@ -39,6 +95,24 @@ export const handleSocketConnection = (io, socket) => {
       const { content, roomId = "general", recipientId } = data;
 
       if (!content || !content.trim()) return;
+
+      // Guest group chat logic
+      if (socket.user.isGuest && socket.user.sessionId) {
+        const guestRoom = `guest_session_${socket.user.sessionId}`;
+        const messageData = {
+          id: nanoid(),
+          content: content.trim(),
+          senderId: socket.user.id,
+          senderName: socket.user.username,
+          timestamp: new Date(),
+          type: "text",
+        };
+        // No DB save for guests (optional)
+        io.to(guestRoom).emit("message", messageData);
+        removeTypingUser(socket.user.id, guestRoom);
+        io.to(guestRoom).emit("userStoppedTyping", socket.user.username);
+        return;
+      }
 
       // Prevent sending messages to self in private chat
       if (recipientId && recipientId === socket.user.id) {
@@ -135,10 +209,10 @@ export const handleSocketConnection = (io, socket) => {
   // Handle join private room
   socket.on("joinPrivateRoom", ({ otherUserId }) => {
     if (!otherUserId || otherUserId === socket.user.id) return;
+    if (socket.user.isGuest && socket.user.sessionId) return; // guests don't use private rooms
     const privateRoomId = getPrivateRoomId(socket.user.id, otherUserId);
     socket.join(privateRoomId);
     loadRecentMessages(socket, privateRoomId);
-    // Optionally, send a system message for joining
   });
 
   // Handle disconnect
@@ -151,14 +225,40 @@ export const handleSocketConnection = (io, socket) => {
     // Remove from typing users
     removeTypingUser(socket.user.id);
 
-    // Broadcast updated online users
-    const onlineUsersList = Array.from(onlineUsers.entries()).map(
-      ([userId, user]) => ({ userId, username: user.username })
-    );
-    io.emit("onlineUsers", onlineUsersList);
-    socket.broadcast.emit("userOffline", {
-      userId: socket.user.id,
-      username: socket.user.username,
+    // Broadcast filtered online users to all sockets
+    io.sockets.sockets.forEach((s) => {
+      const sUser = Array.from(onlineUsers.entries()).find(
+        ([id, u]) => u.socketId === s.id
+      );
+      if (sUser) {
+        const [id] = sUser;
+        const userObj = onlineUsers.get(id);
+        if (userObj) {
+          s.emit(
+            "onlineUsers",
+            (() => {
+              if (userObj.isGuest) {
+                return Array.from(onlineUsers.entries())
+                  .filter(
+                    ([_, user]) =>
+                      user.isGuest && user.sessionId === userObj.sessionId
+                  )
+                  .map(([userId, user]) => ({
+                    userId,
+                    username: user.username,
+                  }));
+              } else {
+                return Array.from(onlineUsers.entries())
+                  .filter(([_, user]) => !user.isGuest)
+                  .map(([userId, user]) => ({
+                    userId,
+                    username: user.username,
+                  }));
+              }
+            })()
+          );
+        }
+      }
     });
 
     // Broadcast stop typing

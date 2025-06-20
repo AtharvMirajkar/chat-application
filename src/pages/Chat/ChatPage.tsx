@@ -67,7 +67,12 @@ const ChatPage: React.FC = () => {
   }, [dispatch]);
 
   useEffect(() => {
-    if (
+    if (isGuestMode && sessionId) {
+      // Join guest session room
+      const guestRoom = `guest_session_${sessionId}`;
+      socketService.getSocket()?.emit("joinRoom", guestRoom);
+      dispatch(setChatRoom(guestRoom));
+    } else if (
       selectedUser &&
       loggedInUserId &&
       selectedUser.userId !== loggedInUserId
@@ -82,7 +87,7 @@ const ChatPage: React.FC = () => {
     } else {
       dispatch(setChatRoom(""));
     }
-  }, [selectedUser, loggedInUserId, dispatch]);
+  }, [isGuestMode, sessionId, selectedUser, loggedInUserId, dispatch]);
 
   const handleSendMessage = (messageContent: string) => {
     // Message will be added via socket event
@@ -212,7 +217,9 @@ const ChatPage: React.FC = () => {
               </IconButton>
             )}
             <Typography variant="h6" sx={{ flexGrow: 1 }}>
-              {selectedUser
+              {isGuestMode && sessionId
+                ? `Guest Session: ${sessionId}`
+                : selectedUser
                 ? `Chatting with: ${selectedUser.username}`
                 : "Select a user to chat"}
             </Typography>
@@ -242,7 +249,11 @@ const ChatPage: React.FC = () => {
             }}
           >
             <Box sx={{ flex: 1, p: 1 }}>
-              {!selectedUser || selectedUser.userId === loggedInUserId ? (
+              {isGuestMode && sessionId ? (
+                messages.map((message) => (
+                  <MessageBubble key={message.id} message={message} />
+                ))
+              ) : !selectedUser || selectedUser.userId === loggedInUserId ? (
                 <Box
                   sx={{
                     display: "flex",
@@ -273,9 +284,10 @@ const ChatPage: React.FC = () => {
           </Box>
 
           {/* Chat Input */}
-          {selectedUser && selectedUser.userId !== loggedInUserId && (
+          {(isGuestMode && sessionId) ||
+          (selectedUser && selectedUser.userId !== loggedInUserId) ? (
             <ChatInput onSendMessage={handleSendMessage} />
-          )}
+          ) : null}
         </Box>
       </Box>
     </Container>

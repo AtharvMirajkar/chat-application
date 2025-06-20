@@ -3,6 +3,8 @@ import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 export interface OnlineUser {
   userId: string;
   username: string;
+  isGuest?: boolean;
+  sessionId?: string | null;
 }
 
 export interface Message {

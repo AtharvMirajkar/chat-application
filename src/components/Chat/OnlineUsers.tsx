@@ -23,9 +23,24 @@ const OnlineUsers: React.FC<OnlineUsersProps> = ({ collapsed = false }) => {
   const dispatch = useAppDispatch();
   const { onlineUsers, selectedUser } = useAppSelector((state) => state.chat);
   const { user } = useAppSelector((state) => state.auth);
+  const { isGuestMode, sessionId } = useAppSelector((state) => state.guest);
   const loggedInUserId = user?.id;
 
-  const filteredUsers = onlineUsers.filter((u) => u.userId !== loggedInUserId);
+  let filteredUsers = onlineUsers;
+  if (isGuestMode) {
+    filteredUsers = onlineUsers.filter(
+      (u) =>
+        u.userId !== loggedInUserId &&
+        u.userId &&
+        sessionId &&
+        u.userId !== undefined &&
+        u.sessionId === sessionId
+    );
+  } else {
+    filteredUsers = onlineUsers.filter(
+      (u) => u.userId !== loggedInUserId && !u.isGuest
+    );
+  }
 
   const handleSelectUser = (user: (typeof onlineUsers)[0]) => {
     dispatch(setSelectedUser(user));

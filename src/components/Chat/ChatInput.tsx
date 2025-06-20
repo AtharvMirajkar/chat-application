@@ -16,23 +16,30 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
     (state) => state.chat
   );
   const { user } = useAppSelector((state) => state.auth);
+  const { isGuestMode, sessionId } = useAppSelector((state) => state.guest);
   const loggedInUserId = user?.id;
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      message.trim() &&
-      selectedUser &&
-      selectedUser.userId !== loggedInUserId
-    ) {
-      socketService.sendMessage(
-        message.trim(),
-        currentChatRoom || undefined,
-        selectedUser.userId
-      );
-      onSendMessage?.(message.trim());
-      setMessage("");
-      handleStopTyping();
+    if (message.trim()) {
+      if (isGuestMode && sessionId) {
+        // Send to guest session room
+        socketService.sendMessage(message.trim(), `guest_session_${sessionId}`);
+        onSendMessage?.(message.trim());
+        setMessage("");
+        handleStopTyping();
+        return;
+      }
+      if (selectedUser && selectedUser.userId !== loggedInUserId) {
+        socketService.sendMessage(
+          message.trim(),
+          currentChatRoom || undefined,
+          selectedUser.userId
+        );
+        onSendMessage?.(message.trim());
+        setMessage("");
+        handleStopTyping();
+      }
     }
   };
 
@@ -115,8 +122,9 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
         color="primary"
         disabled={
           !message.trim() ||
-          !selectedUser ||
-          selectedUser.userId === loggedInUserId
+          (isGuestMode && !sessionId) ||
+          (!isGuestMode &&
+            (!selectedUser || selectedUser.userId === loggedInUserId))
         }
         sx={{
           bgcolor: "primary.main",
