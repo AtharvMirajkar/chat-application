@@ -1,4 +1,9 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSlice, PayloadAction } from "@reduxjs/toolkit";
+
+export interface OnlineUser {
+  userId: string;
+  username: string;
+}
 
 export interface Message {
   id: string;
@@ -6,15 +11,16 @@ export interface Message {
   senderName: string;
   content: string;
   timestamp: Date;
-  type: 'text' | 'system';
+  type: "text" | "system";
 }
 
 interface ChatState {
   messages: Message[];
-  onlineUsers: string[];
+  onlineUsers: OnlineUser[];
   typingUsers: string[];
   currentChatRoom: string | null;
   isConnected: boolean;
+  selectedUser: OnlineUser | null;
 }
 
 const initialState: ChatState = {
@@ -23,10 +29,11 @@ const initialState: ChatState = {
   typingUsers: [],
   currentChatRoom: null,
   isConnected: false,
+  selectedUser: null,
 };
 
 const chatSlice = createSlice({
-  name: 'chat',
+  name: "chat",
   initialState,
   reducers: {
     addMessage: (state, action: PayloadAction<Message>) => {
@@ -35,16 +42,18 @@ const chatSlice = createSlice({
     setMessages: (state, action: PayloadAction<Message[]>) => {
       state.messages = action.payload;
     },
-    setOnlineUsers: (state, action: PayloadAction<string[]>) => {
+    setOnlineUsers: (state, action: PayloadAction<OnlineUser[]>) => {
       state.onlineUsers = action.payload;
     },
-    addOnlineUser: (state, action: PayloadAction<string>) => {
-      if (!state.onlineUsers.includes(action.payload)) {
+    addOnlineUser: (state, action: PayloadAction<OnlineUser>) => {
+      if (!state.onlineUsers.some((u) => u.userId === action.payload.userId)) {
         state.onlineUsers.push(action.payload);
       }
     },
     removeOnlineUser: (state, action: PayloadAction<string>) => {
-      state.onlineUsers = state.onlineUsers.filter(id => id !== action.payload);
+      state.onlineUsers = state.onlineUsers.filter(
+        (u) => u.userId !== action.payload
+      );
     },
     setTypingUsers: (state, action: PayloadAction<string[]>) => {
       state.typingUsers = action.payload;
@@ -55,7 +64,9 @@ const chatSlice = createSlice({
       }
     },
     removeTypingUser: (state, action: PayloadAction<string>) => {
-      state.typingUsers = state.typingUsers.filter(id => id !== action.payload);
+      state.typingUsers = state.typingUsers.filter(
+        (id) => id !== action.payload
+      );
     },
     setChatRoom: (state, action: PayloadAction<string>) => {
       state.currentChatRoom = action.payload;
@@ -67,6 +78,12 @@ const chatSlice = createSlice({
       state.messages = [];
       state.typingUsers = [];
       state.currentChatRoom = null;
+    },
+    setSelectedUser: (state, action: PayloadAction<OnlineUser | null>) => {
+      state.selectedUser = action.payload;
+    },
+    clearSelectedUser: (state) => {
+      state.selectedUser = null;
     },
   },
 });
@@ -83,6 +100,8 @@ export const {
   setChatRoom,
   setConnected,
   clearChat,
+  setSelectedUser,
+  clearSelectedUser,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

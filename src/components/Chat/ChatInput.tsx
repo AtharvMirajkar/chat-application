@@ -1,30 +1,37 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  Box,
-  TextField,
-  IconButton,
-  Paper,
-} from '@mui/material';
-import { Send } from '@mui/icons-material';
-import { socketService } from '../../services/socketService';
-import { useAppSelector } from '../../store/hooks';
+import React, { useState, useRef, useEffect } from "react";
+import { Box, TextField, IconButton, Paper } from "@mui/material";
+import { Send } from "@mui/icons-material";
+import { socketService } from "../../services/socketService";
+import { useAppSelector } from "../../store/hooks";
 
 interface ChatInputProps {
   onSendMessage?: (message: string) => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout>();
-  const { currentChatRoom } = useAppSelector((state) => state.chat);
+  const { currentChatRoom, selectedUser } = useAppSelector(
+    (state) => state.chat
+  );
+  const { user } = useAppSelector((state) => state.auth);
+  const loggedInUserId = user?.id;
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim()) {
-      socketService.sendMessage(message.trim(), currentChatRoom || undefined);
+    if (
+      message.trim() &&
+      selectedUser &&
+      selectedUser.userId !== loggedInUserId
+    ) {
+      socketService.sendMessage(
+        message.trim(),
+        currentChatRoom || undefined,
+        selectedUser.userId
+      );
       onSendMessage?.(message.trim());
-      setMessage('');
+      setMessage("");
       handleStopTyping();
     }
   };
@@ -34,12 +41,12 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
       setIsTyping(true);
       socketService.startTyping(currentChatRoom || undefined);
     }
-    
+
     // Clear existing timeout
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
-    
+
     // Set new timeout
     typingTimeoutRef.current = setTimeout(() => {
       handleStopTyping();
@@ -51,7 +58,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
       setIsTyping(false);
       socketService.stopTyping(currentChatRoom || undefined);
     }
-    
+
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current);
     }
@@ -80,12 +87,12 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
       onSubmit={handleSendMessage}
       sx={{
         p: 2,
-        display: 'flex',
-        alignItems: 'center',
+        display: "flex",
+        alignItems: "center",
         gap: 1,
         borderRadius: 0,
         borderTop: 1,
-        borderColor: 'divider',
+        borderColor: "divider",
       }}
     >
       <TextField
@@ -98,7 +105,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
         multiline
         maxRows={4}
         sx={{
-          '& .MuiOutlinedInput-root': {
+          "& .MuiOutlinedInput-root": {
             borderRadius: 3,
           },
         }}
@@ -106,15 +113,19 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage }) => {
       <IconButton
         type="submit"
         color="primary"
-        disabled={!message.trim()}
+        disabled={
+          !message.trim() ||
+          !selectedUser ||
+          selectedUser.userId === loggedInUserId
+        }
         sx={{
-          bgcolor: 'primary.main',
-          color: 'primary.contrastText',
-          '&:hover': {
-            bgcolor: 'primary.dark',
+          bgcolor: "primary.main",
+          color: "primary.contrastText",
+          "&:hover": {
+            bgcolor: "primary.dark",
           },
-          '&:disabled': {
-            bgcolor: 'action.disabledBackground',
+          "&:disabled": {
+            bgcolor: "action.disabledBackground",
           },
         }}
       >

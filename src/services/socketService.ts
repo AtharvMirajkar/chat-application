@@ -1,5 +1,5 @@
-import { io, Socket } from 'socket.io-client';
-import { store } from '../store/store';
+import { io, Socket } from "socket.io-client";
+import { store } from "../store/store";
 import {
   addMessage,
   setOnlineUsers,
@@ -9,22 +9,27 @@ import {
   removeTypingUser,
   setConnected,
   Message,
-} from '../features/chat/chatSlice';
+  OnlineUser,
+} from "../features/chat/chatSlice";
 
 class SocketService {
   private socket: Socket | null = null;
-  private serverURL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
+  private serverURL =
+    import.meta.env.VITE_SOCKET_URL || "http://localhost:5000";
 
-  connect(token?: string, guestData?: { sessionId: string; guestName: string }) {
-    const auth = token 
-      ? { token } 
-      : guestData 
+  connect(
+    token?: string,
+    guestData?: { sessionId: string; guestName: string }
+  ) {
+    const auth = token
+      ? { token }
+      : guestData
       ? { guest: true, ...guestData }
       : {};
 
     this.socket = io(this.serverURL, {
       auth,
-      transports: ['websocket', 'polling'],
+      transports: ["websocket", "polling"],
     });
 
     this.setupEventListeners();
@@ -41,72 +46,72 @@ class SocketService {
   private setupEventListeners() {
     if (!this.socket) return;
 
-    this.socket.on('connect', () => {
-      console.log('Connected to server');
+    this.socket.on("connect", () => {
+      console.log("Connected to server");
       store.dispatch(setConnected(true));
     });
 
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from server');
+    this.socket.on("disconnect", () => {
+      console.log("Disconnected from server");
       store.dispatch(setConnected(false));
     });
 
-    this.socket.on('message', (message: Message) => {
+    this.socket.on("message", (message: Message) => {
       store.dispatch(addMessage(message));
     });
 
-    this.socket.on('userOnline', (userId: string) => {
-      store.dispatch(addOnlineUser(userId));
+    this.socket.on("userOnline", (user: OnlineUser) => {
+      store.dispatch(addOnlineUser(user));
     });
 
-    this.socket.on('userOffline', (userId: string) => {
-      store.dispatch(removeOnlineUser(userId));
+    this.socket.on("userOffline", (user: OnlineUser) => {
+      store.dispatch(removeOnlineUser(user.userId));
     });
 
-    this.socket.on('onlineUsers', (users: string[]) => {
+    this.socket.on("onlineUsers", (users: OnlineUser[]) => {
       store.dispatch(setOnlineUsers(users));
     });
 
-    this.socket.on('userTyping', (userId: string) => {
+    this.socket.on("userTyping", (userId: string) => {
       store.dispatch(addTypingUser(userId));
     });
 
-    this.socket.on('userStoppedTyping', (userId: string) => {
+    this.socket.on("userStoppedTyping", (userId: string) => {
       store.dispatch(removeTypingUser(userId));
     });
 
-    this.socket.on('error', (error: any) => {
-      console.error('Socket error:', error);
+    this.socket.on("error", (error: any) => {
+      console.error("Socket error:", error);
     });
   }
 
-  sendMessage(content: string, roomId?: string) {
+  sendMessage(content: string, roomId?: string, recipientId?: string) {
     if (this.socket) {
-      this.socket.emit('message', { content, roomId });
+      this.socket.emit("message", { content, roomId, recipientId });
     }
   }
 
   joinRoom(roomId: string) {
     if (this.socket) {
-      this.socket.emit('joinRoom', roomId);
+      this.socket.emit("joinRoom", roomId);
     }
   }
 
   leaveRoom(roomId: string) {
     if (this.socket) {
-      this.socket.emit('leaveRoom', roomId);
+      this.socket.emit("leaveRoom", roomId);
     }
   }
 
   startTyping(roomId?: string) {
     if (this.socket) {
-      this.socket.emit('typing', { roomId });
+      this.socket.emit("typing", { roomId });
     }
   }
 
   stopTyping(roomId?: string) {
     if (this.socket) {
-      this.socket.emit('stopTyping', { roomId });
+      this.socket.emit("stopTyping", { roomId });
     }
   }
 
