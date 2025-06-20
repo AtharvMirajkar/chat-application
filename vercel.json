@@ -1,0 +1,8 @@
+{
+  "rewrites": [Add commentMore actions
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
