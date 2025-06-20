@@ -1,5 +1,5 @@
 {
-  "rewrites": [Add commentMore actions
+  "rewrites": [
     {
       "source": "/(.*)",
       "destination": "/index.html"
